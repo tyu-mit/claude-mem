@@ -997,7 +997,8 @@ export class WorkerService {
  * @param port - The TCP port (used for port-in-use checks and daemon spawn)
  * @returns true if worker is healthy (existing or newly started), false on failure
  */
-async function ensureWorkerStarted(port: number): Promise<boolean> {
+async function ensureWorkerStarted(port: number, options?: { waitForReadiness?: boolean }): Promise<boolean> {
+  const shouldWaitForReadiness = options?.waitForReadiness ?? true;
   // Clean stale PID file first (cheap: 1 fs read + 1 signal-0 check)
   const pidFileStatus = cleanStalePidFile();
   if (pidFileStatus === 'alive') {
@@ -1088,11 +1089,15 @@ async function ensureWorkerStarted(port: number): Promise<boolean> {
     return false;
   }
 
-  // Health passed (HTTP listening). Now wait for DB + search initialization
+  // Health passed (HTTP listening). Optionally wait for DB + search initialization
   // so hooks that run immediately after can actually use the worker.
-  const ready = await waitForReadiness(port, getPlatformTimeout(HOOK_TIMEOUTS.READINESS_WAIT));
-  if (!ready) {
-    logger.warn('SYSTEM', 'Worker is alive but readiness timed out — proceeding anyway');
+  // Skipped for the 'start' CLI command (not a hook) to avoid keeping two Bun
+  // processes alive simultaneously, which can trigger macOS OOM kills.
+  if (shouldWaitForReadiness) {
+    const ready = await waitForReadiness(port, getPlatformTimeout(HOOK_TIMEOUTS.READINESS_WAIT));
+    if (!ready) {
+      logger.warn('SYSTEM', 'Worker is alive but readiness timed out — proceeding anyway');
+    }
   }
 
   clearWorkerSpawnAttempted();
@@ -1129,7 +1134,10 @@ async function main() {
 
   switch (command) {
     case 'start': {
-      const success = await ensureWorkerStarted(port);
+      // Skip readiness wait: 'start' is a CLI management command, not a hook.
+      // Waiting 30s for DB init keeps two Bun processes alive simultaneously,
+      // triggering macOS OOM kills. Hooks that need DB readiness handle this themselves.
+      const success = await ensureWorkerStarted(port, { waitForReadiness: false });
       if (success) {
         exitWithStatus('ready');
       } else {

@@ -1670,9 +1670,9 @@ export class SessionStore {
       `);
 
       for (const observation of observations) {
-        // Content-hash deduplication (same logic as storeObservation singular)
+        // Content-hash deduplication with fuzzy fallback (same logic as storeObservation singular)
         const contentHash = computeObservationContentHash(memorySessionId, observation.title, observation.narrative);
-        const existing = findDuplicateObservation(this.db, contentHash, timestampEpoch);
+        const existing = findDuplicateObservation(this.db, contentHash, timestampEpoch, observation.title, observation.narrative);
         if (existing) {
           observationIds.push(existing.id);
           continue;
@@ -1799,9 +1799,9 @@ export class SessionStore {
       `);
 
       for (const observation of observations) {
-        // Content-hash deduplication (same logic as storeObservation singular)
+        // Content-hash deduplication with fuzzy fallback (same logic as storeObservation singular)
         const contentHash = computeObservationContentHash(memorySessionId, observation.title, observation.narrative);
-        const existing = findDuplicateObservation(this.db, contentHash, timestampEpoch);
+        const existing = findDuplicateObservation(this.db, contentHash, timestampEpoch, observation.title, observation.narrative);
         if (existing) {
           observationIds.push(existing.id);
           continue;

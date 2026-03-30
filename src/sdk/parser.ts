@@ -4,7 +4,11 @@
  */
 
 import { logger } from '../utils/logger.js';
+import { similarity } from '../utils/string-similarity.js';
 import { ModeManager } from '../services/domain/ModeManager.js';
+
+/** Similarity threshold for parser-level dedup. Set high (0.95) to avoid suppressing similar but meaningfully different observations. */
+const PARSER_DEDUP_THRESHOLD = 0.95;
 
 export interface ParsedObservation {
   type: string;
@@ -93,6 +97,35 @@ export function parseObservations(text: string, correlationId?: string): ParsedO
       files_read,
       files_modified
     });
+  }
+
+  // Deduplicate observations: skip entries with highly similar title AND narrative.
+  // LLMs (especially Gemini) sometimes repeat identical or near-identical observation
+  // blocks in a single response. Catching duplicates here prevents them from reaching
+  // storage, Chroma sync, and SSE broadcast.
+  //
+  // Note: uses fuzzy matching on BOTH title and narrative (titleSim > 0.95 AND
+  // narrativeSim > 0.95), unlike storage-level dedup in findDuplicateObservation()
+  // which requires exact title match + fuzzy narrative. Parser handles within-response
+  // duplicates; storage handles cross-request duplicates (concurrent agents, retries).
+  if (observations.length > 1) {
+    const deduped: ParsedObservation[] = [];
+    for (const obs of observations) {
+      const isDuplicate = deduped.some(existing => {
+        const titleSim = similarity(existing.title ?? '', obs.title ?? '');
+        const narrativeSim = similarity(existing.narrative ?? '', obs.narrative ?? '');
+        return titleSim > PARSER_DEDUP_THRESHOLD && narrativeSim > PARSER_DEDUP_THRESHOLD;
+      });
+      if (isDuplicate) {
+        logger.debug('PARSER', `Skipped duplicate observation in response | title="${obs.title}"`, { correlationId });
+      } else {
+        deduped.push(obs);
+      }
+    }
+    if (deduped.length < observations.length) {
+      logger.info('PARSER', `Deduped ${observations.length - deduped.length} duplicate observation(s) from response`, { correlationId, original: observations.length, deduped: deduped.length });
+    }
+    return deduped;
   }
 
   return observations;

@@ -69,6 +69,37 @@ describe('TRIAGE-03: Data Integrity', () => {
       expect(hash.length).toBe(16);
     });
 
+    it('computeObservationContentHash normalizes whitespace differences', () => {
+      const hash1 = computeObservationContentHash('session-1', 'Title  A', 'Narrative  A');
+      const hash2 = computeObservationContentHash('session-1', 'Title A', 'Narrative A');
+      expect(hash1).toBe(hash2);
+    });
+
+    it('computeObservationContentHash normalizes tabs and newlines', () => {
+      const hash1 = computeObservationContentHash('session-1', 'Title\tA', 'Narrative\nA');
+      const hash2 = computeObservationContentHash('session-1', 'Title A', 'Narrative A');
+      expect(hash1).toBe(hash2);
+    });
+
+    it('computeObservationContentHash normalizes trailing whitespace', () => {
+      const hash1 = computeObservationContentHash('session-1', 'Title A  ', 'Narrative A  ');
+      const hash2 = computeObservationContentHash('session-1', 'Title A', 'Narrative A');
+      expect(hash1).toBe(hash2);
+    });
+
+    it('computeObservationContentHash normalizes Unicode NFC variants', () => {
+      // é as single codepoint vs e + combining accent
+      const hash1 = computeObservationContentHash('session-1', 'caf\u00e9', 'resum\u00e9');
+      const hash2 = computeObservationContentHash('session-1', 'cafe\u0301', 'resume\u0301');
+      expect(hash1).toBe(hash2);
+    });
+
+    it('computeObservationContentHash is case-sensitive by design', () => {
+      const hash1 = computeObservationContentHash('session-1', 'API Endpoint', 'Added auth');
+      const hash2 = computeObservationContentHash('session-1', 'api endpoint', 'added auth');
+      expect(hash1).not.toBe(hash2);
+    });
+
     it('storeObservation deduplicates identical observations within 30s window', () => {
       const memId = createSessionWithMemoryId(db, 'content-dedup-1', 'mem-dedup-1');
       const obs = createObservationInput({ title: 'Same Title', narrative: 'Same Narrative' });
@@ -132,6 +163,75 @@ describe('TRIAGE-03: Data Integrity', () => {
       // Only 1 row in the database
       const count = db.prepare('SELECT COUNT(*) as count FROM observations').get() as { count: number };
       expect(count.count).toBe(1);
+    });
+  });
+
+  describe('Fuzzy deduplication', () => {
+    it('findDuplicateObservation catches near-identical narratives via fuzzy match', () => {
+      const memId = createSessionWithMemoryId(db, 'fuzzy-1', 'mem-fuzzy-1');
+      const obs1 = createObservationInput({
+        title: 'Database Migration',
+        narrative: 'Completed the first successful dry-run of the schema migration.',
+      });
+
+      const now = Date.now();
+      storeObservation(db, memId, 'test-project', obs1, 1, 0, now);
+
+      // Near-identical narrative (minor wording difference)
+      const contentHash = computeObservationContentHash(memId, 'Database Migration', 'Completed the first successful dry run of the schema migration.');
+      const existing = findDuplicateObservation(db, contentHash, now + 1000, 'Database Migration', 'Completed the first successful dry run of the schema migration.');
+      expect(existing).not.toBeNull();
+    });
+
+    it('findDuplicateObservation allows genuinely different observations with same title', () => {
+      const memId = createSessionWithMemoryId(db, 'fuzzy-2', 'mem-fuzzy-2');
+      const obs1 = createObservationInput({
+        title: 'API Endpoint',
+        narrative: 'Added authentication middleware to the /users endpoint.',
+      });
+
+      const now = Date.now();
+      storeObservation(db, memId, 'test-project', obs1, 1, 0, now);
+
+      // Completely different narrative with the same title
+      const contentHash = computeObservationContentHash(memId, 'API Endpoint', 'Removed deprecated rate limiting from the /health endpoint.');
+      const existing = findDuplicateObservation(db, contentHash, now + 1000, 'API Endpoint', 'Removed deprecated rate limiting from the /health endpoint.');
+      expect(existing).toBeNull();
+    });
+
+    it('findDuplicateObservation skips fuzzy path when title is null', () => {
+      const memId = createSessionWithMemoryId(db, 'fuzzy-null', 'mem-fuzzy-null');
+      const obs1 = createObservationInput({
+        title: null,
+        narrative: 'Some narrative about a task.',
+      });
+
+      const now = Date.now();
+      storeObservation(db, memId, 'test-project', obs1, 1, 0, now);
+
+      // Different hash but null title — fuzzy path should be skipped, no match
+      const contentHash = computeObservationContentHash(memId, null, 'Some narrative about a task!');
+      const existing = findDuplicateObservation(db, contentHash, now + 1000, null, 'Some narrative about a task!');
+      expect(existing).toBeNull();
+    });
+
+    it('storeObservation deduplicates near-identical observations via fuzzy match', () => {
+      const memId = createSessionWithMemoryId(db, 'fuzzy-3', 'mem-fuzzy-3');
+      const obs1 = createObservationInput({
+        title: 'Feature Complete',
+        narrative: 'The authentication feature is now fully implemented and tested.',
+      });
+      const obs2 = createObservationInput({
+        title: 'Feature Complete',
+        narrative: 'The authentication feature is now fully implemented and tested!',
+      });
+
+      const now = Date.now();
+      const result1 = storeObservation(db, memId, 'test-project', obs1, 1, 0, now);
+      const result2 = storeObservation(db, memId, 'test-project', obs2, 1, 0, now + 500);
+
+      // Second should be deduped to the first via fuzzy match
+      expect(result2.id).toBe(result1.id);
     });
   });
 

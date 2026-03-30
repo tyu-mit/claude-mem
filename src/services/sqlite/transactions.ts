@@ -74,7 +74,7 @@ export function storeObservationsAndMarkComplete(
 
     for (const observation of observations) {
       const contentHash = computeObservationContentHash(memorySessionId, observation.title, observation.narrative);
-      const existing = findDuplicateObservation(db, contentHash, timestampEpoch);
+      const existing = findDuplicateObservation(db, contentHash, timestampEpoch, observation.title, observation.narrative);
       if (existing) {
         observationIds.push(existing.id);
         continue;
@@ -193,7 +193,7 @@ export function storeObservations(
 
     for (const observation of observations) {
       const contentHash = computeObservationContentHash(memorySessionId, observation.title, observation.narrative);
-      const existing = findDuplicateObservation(db, contentHash, timestampEpoch);
+      const existing = findDuplicateObservation(db, contentHash, timestampEpoch, observation.title, observation.narrative);
       if (existing) {
         observationIds.push(existing.id);
         continue;

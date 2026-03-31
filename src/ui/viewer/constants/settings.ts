@@ -36,4 +36,7 @@ export const DEFAULT_SETTINGS = {
   // Exclusion Settings
   CLAUDE_MEM_EXCLUDED_PROJECTS: '',
   CLAUDE_MEM_FOLDER_MD_EXCLUDE: '[]',
+
+  // Deduplication
+  CLAUDE_MEM_DEDUP_SIMILARITY_THRESHOLD: '0.95',
 } as const;

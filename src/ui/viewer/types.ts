@@ -84,6 +84,9 @@ export interface Settings {
   // Feature Toggles
   CLAUDE_MEM_CONTEXT_SHOW_LAST_SUMMARY?: string;
   CLAUDE_MEM_CONTEXT_SHOW_LAST_MESSAGE?: string;
+
+  // Deduplication
+  CLAUDE_MEM_DEDUP_SIMILARITY_THRESHOLD?: string;  // '0.0' to '1.0'
 }
 
 export interface WorkerStats {

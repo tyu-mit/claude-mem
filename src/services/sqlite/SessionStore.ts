@@ -1523,9 +1523,9 @@ export class SessionStore {
     const timestampEpoch = overrideTimestampEpoch ?? Date.now();
     const timestampIso = new Date(timestampEpoch).toISOString();
 
-    // Content-hash deduplication
+    // Content-hash deduplication with fuzzy fallback
     const contentHash = computeObservationContentHash(memorySessionId, observation.title, observation.narrative);
-    const existing = findDuplicateObservation(this.db, contentHash, timestampEpoch);
+    const existing = findDuplicateObservation(this.db, memorySessionId, contentHash, timestampEpoch, observation.title, observation.narrative);
     if (existing) {
       return { id: existing.id, createdAtEpoch: existing.created_at_epoch };
     }
@@ -1672,7 +1672,7 @@ export class SessionStore {
       for (const observation of observations) {
         // Content-hash deduplication with fuzzy fallback (same logic as storeObservation singular)
         const contentHash = computeObservationContentHash(memorySessionId, observation.title, observation.narrative);
-        const existing = findDuplicateObservation(this.db, contentHash, timestampEpoch, observation.title, observation.narrative);
+        const existing = findDuplicateObservation(this.db, memorySessionId, contentHash, timestampEpoch, observation.title, observation.narrative);
         if (existing) {
           observationIds.push(existing.id);
           continue;
@@ -1801,7 +1801,7 @@ export class SessionStore {
       for (const observation of observations) {
         // Content-hash deduplication with fuzzy fallback (same logic as storeObservation singular)
         const contentHash = computeObservationContentHash(memorySessionId, observation.title, observation.narrative);
-        const existing = findDuplicateObservation(this.db, contentHash, timestampEpoch, observation.title, observation.narrative);
+        const existing = findDuplicateObservation(this.db, memorySessionId, contentHash, timestampEpoch, observation.title, observation.narrative);
         if (existing) {
           observationIds.push(existing.id);
           continue;

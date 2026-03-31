@@ -6,9 +6,13 @@
 import { logger } from '../utils/logger.js';
 import { similarity } from '../utils/string-similarity.js';
 import { ModeManager } from '../services/domain/ModeManager.js';
+import { SettingsDefaultsManager } from '../shared/SettingsDefaultsManager.js';
 
-/** Similarity threshold for parser-level dedup. Set high (0.95) to avoid suppressing similar but meaningfully different observations. */
-const PARSER_DEDUP_THRESHOLD = 0.95;
+/** Get the dedup similarity threshold from settings (0.0–1.0). */
+function getDedupThreshold(): number {
+  const val = parseFloat(SettingsDefaultsManager.get('CLAUDE_MEM_DEDUP_SIMILARITY_THRESHOLD'));
+  return isNaN(val) ? 0.95 : val;
+}
 
 export interface ParsedObservation {
   type: string;
@@ -104,17 +108,21 @@ export function parseObservations(text: string, correlationId?: string): ParsedO
   // blocks in a single response. Catching duplicates here prevents them from reaching
   // storage, Chroma sync, and SSE broadcast.
   //
-  // Note: uses fuzzy matching on BOTH title and narrative (titleSim > 0.95 AND
-  // narrativeSim > 0.95), unlike storage-level dedup in findDuplicateObservation()
+  // Note: uses fuzzy matching on BOTH title and narrative (titleSim > threshold AND
+  // narrativeSim > threshold), unlike storage-level dedup in findDuplicateObservation()
   // which requires exact title match + fuzzy narrative. Parser handles within-response
   // duplicates; storage handles cross-request duplicates (concurrent agents, retries).
   if (observations.length > 1) {
     const deduped: ParsedObservation[] = [];
+    const threshold = getDedupThreshold();
     for (const obs of observations) {
       const isDuplicate = deduped.some(existing => {
-        const titleSim = similarity(existing.title ?? '', obs.title ?? '');
-        const narrativeSim = similarity(existing.narrative ?? '', obs.narrative ?? '');
-        return titleSim > PARSER_DEDUP_THRESHOLD && narrativeSim > PARSER_DEDUP_THRESHOLD;
+        if (!existing.title || !obs.title || !existing.narrative || !obs.narrative) {
+          return false;
+        }
+        const titleSim = similarity(existing.title, obs.title);
+        const narrativeSim = similarity(existing.narrative, obs.narrative);
+        return titleSim > threshold && narrativeSim > threshold;
       });
       if (isDuplicate) {
         logger.debug('PARSER', `Skipped duplicate observation in response | title="${obs.title}"`, { correlationId });

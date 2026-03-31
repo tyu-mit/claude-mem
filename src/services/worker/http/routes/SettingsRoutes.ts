@@ -266,6 +266,14 @@ export class SettingsRoutes extends BaseRouteHandler {
       }
     }
 
+    // Validate CLAUDE_MEM_DEDUP_SIMILARITY_THRESHOLD (0.0-1.0)
+    if (settings.CLAUDE_MEM_DEDUP_SIMILARITY_THRESHOLD !== undefined) {
+      const threshold = Number(settings.CLAUDE_MEM_DEDUP_SIMILARITY_THRESHOLD);
+      if (!Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
+        return { valid: false, error: 'CLAUDE_MEM_DEDUP_SIMILARITY_THRESHOLD must be a number between 0.0 and 1.0' };
+      }
+    }
+
     // Validate CLAUDE_MEM_WORKER_HOST (IP address or 0.0.0.0)
     if (settings.CLAUDE_MEM_WORKER_HOST) {
       const host = settings.CLAUDE_MEM_WORKER_HOST;

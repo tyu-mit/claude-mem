@@ -16,8 +16,9 @@ const DEDUP_WINDOW_MS = 30_000;
 
 /** Get the fuzzy dedup similarity threshold from settings (0.0–1.0). */
 function getDedupThreshold(): number {
-  const val = parseFloat(SettingsDefaultsManager.get('CLAUDE_MEM_DEDUP_SIMILARITY_THRESHOLD'));
-  return isNaN(val) ? 0.95 : val;
+  const val = Number(SettingsDefaultsManager.get('CLAUDE_MEM_DEDUP_SIMILARITY_THRESHOLD'));
+  if (!Number.isFinite(val)) return 0.95;
+  return Math.min(1, Math.max(0, val));
 }
 
 /**
@@ -94,7 +95,7 @@ export function findDuplicateObservation(
         logger.debug('DEDUP', `Fuzzy match skipped — narrative exceeds max length for Levenshtein | title="${title}" | existingId=${candidate.id}`);
         continue;
       }
-      if (sim > threshold) {
+      if (sim >= threshold) {
         logger.debug('DEDUP', `Fuzzy match found | title="${title}" | similarity=${sim.toFixed(3)} | existingId=${candidate.id}`);
         return { id: candidate.id, created_at_epoch: candidate.created_at_epoch };
       }

@@ -10,8 +10,9 @@ import { SettingsDefaultsManager } from '../shared/SettingsDefaultsManager.js';
 
 /** Get the dedup similarity threshold from settings (0.0–1.0). */
 function getDedupThreshold(): number {
-  const val = parseFloat(SettingsDefaultsManager.get('CLAUDE_MEM_DEDUP_SIMILARITY_THRESHOLD'));
-  return isNaN(val) ? 0.95 : val;
+  const val = Number(SettingsDefaultsManager.get('CLAUDE_MEM_DEDUP_SIMILARITY_THRESHOLD'));
+  if (!Number.isFinite(val)) return 0.95;
+  return Math.min(1, Math.max(0, val));
 }
 
 export interface ParsedObservation {
@@ -108,8 +109,8 @@ export function parseObservations(text: string, correlationId?: string): ParsedO
   // blocks in a single response. Catching duplicates here prevents them from reaching
   // storage, Chroma sync, and SSE broadcast.
   //
-  // Note: uses fuzzy matching on BOTH title and narrative (titleSim > threshold AND
-  // narrativeSim > threshold), unlike storage-level dedup in findDuplicateObservation()
+  // Note: uses fuzzy matching on BOTH title and narrative (titleSim >= threshold AND
+  // narrativeSim >= threshold), unlike storage-level dedup in findDuplicateObservation()
   // which requires exact title match + fuzzy narrative. Parser handles within-response
   // duplicates; storage handles cross-request duplicates (concurrent agents, retries).
   if (observations.length > 1) {
@@ -122,7 +123,7 @@ export function parseObservations(text: string, correlationId?: string): ParsedO
         }
         const titleSim = similarity(existing.title, obs.title);
         const narrativeSim = similarity(existing.narrative, obs.narrative);
-        return titleSim > threshold && narrativeSim > threshold;
+        return titleSim >= threshold && narrativeSim >= threshold;
       });
       if (isDuplicate) {
         logger.debug('PARSER', `Skipped duplicate observation in response | title="${obs.title}"`, { correlationId });

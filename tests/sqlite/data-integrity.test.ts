@@ -179,7 +179,7 @@ describe('TRIAGE-03: Data Integrity', () => {
 
       // Near-identical narrative (minor wording difference)
       const contentHash = computeObservationContentHash(memId, 'Database Migration', 'Completed the first successful dry run of the schema migration.');
-      const existing = findDuplicateObservation(db, contentHash, now + 1000, 'Database Migration', 'Completed the first successful dry run of the schema migration.');
+      const existing = findDuplicateObservation(db, memId, contentHash, now + 1000, 'Database Migration', 'Completed the first successful dry run of the schema migration.');
       expect(existing).not.toBeNull();
     });
 
@@ -195,7 +195,7 @@ describe('TRIAGE-03: Data Integrity', () => {
 
       // Completely different narrative with the same title
       const contentHash = computeObservationContentHash(memId, 'API Endpoint', 'Removed deprecated rate limiting from the /health endpoint.');
-      const existing = findDuplicateObservation(db, contentHash, now + 1000, 'API Endpoint', 'Removed deprecated rate limiting from the /health endpoint.');
+      const existing = findDuplicateObservation(db, memId, contentHash, now + 1000, 'API Endpoint', 'Removed deprecated rate limiting from the /health endpoint.');
       expect(existing).toBeNull();
     });
 
@@ -211,7 +211,7 @@ describe('TRIAGE-03: Data Integrity', () => {
 
       // Different hash but null title — fuzzy path should be skipped, no match
       const contentHash = computeObservationContentHash(memId, null, 'Some narrative about a task!');
-      const existing = findDuplicateObservation(db, contentHash, now + 1000, null, 'Some narrative about a task!');
+      const existing = findDuplicateObservation(db, memId, contentHash, now + 1000, null, 'Some narrative about a task!');
       expect(existing).toBeNull();
     });
 

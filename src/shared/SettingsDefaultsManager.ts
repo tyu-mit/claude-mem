@@ -61,6 +61,8 @@ export interface SettingsDefaults {
   CLAUDE_MEM_TIER_ROUTING_ENABLED: string;   // 'true' | 'false' - enable model tier routing
   CLAUDE_MEM_TIER_SIMPLE_MODEL: string;      // Tier alias or model ID for simple tool observations (Read, Glob, Grep)
   CLAUDE_MEM_TIER_SUMMARY_MODEL: string;     // Tier alias or model ID for session summaries
+  // Deduplication
+  CLAUDE_MEM_DEDUP_SIMILARITY_THRESHOLD: string;  // '0.0' to '1.0' — fuzzy match threshold for observation dedup
   // Chroma Vector Database Configuration
   CLAUDE_MEM_CHROMA_ENABLED: string;   // 'true' | 'false' - set to 'false' for SQLite-only mode
   CLAUDE_MEM_CHROMA_MODE: string;      // 'local' | 'remote'
@@ -127,6 +129,8 @@ export class SettingsDefaultsManager {
     CLAUDE_MEM_TIER_ROUTING_ENABLED: 'true',         // Route observations to models by complexity
     CLAUDE_MEM_TIER_SIMPLE_MODEL: 'haiku', // Portable tier alias — works across Direct API, Bedrock, Vertex, Azure (see #1463)
     CLAUDE_MEM_TIER_SUMMARY_MODEL: '',                // Empty = use default model for summaries
+    // Deduplication
+    CLAUDE_MEM_DEDUP_SIMILARITY_THRESHOLD: '0.95',  // 0.0–1.0; higher = stricter matching (fewer dedup hits)
     // Chroma Vector Database Configuration
     CLAUDE_MEM_CHROMA_ENABLED: 'true',         // Set to 'false' to disable Chroma and use SQLite-only search
     CLAUDE_MEM_CHROMA_MODE: 'local',           // 'local' uses persistent chroma-mcp via uvx, 'remote' connects to existing server

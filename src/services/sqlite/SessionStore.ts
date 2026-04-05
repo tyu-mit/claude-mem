@@ -1341,9 +1341,10 @@ export class SessionStore {
     project: string;
     user_prompt: string;
     custom_title: string | null;
+    started_at_epoch: number;
   } | null {
     const stmt = this.db.prepare(`
-      SELECT id, content_session_id, memory_session_id, project, user_prompt, custom_title
+      SELECT id, content_session_id, memory_session_id, project, user_prompt, custom_title, started_at_epoch
       FROM sdk_sessions
       WHERE id = ?
       LIMIT 1

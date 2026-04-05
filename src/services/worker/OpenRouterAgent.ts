@@ -121,7 +121,9 @@ export class OpenRouterAgent {
         session.cumulativeInputTokens += Math.floor(tokensUsed * 0.7);  // Rough estimate
         session.cumulativeOutputTokens += Math.floor(tokensUsed * 0.3);
 
-        // Process response using shared ResponseProcessor (no original timestamp for init - not from queue)
+        // Use the session's original start time for init prompt observations.
+        // Without this, reprocessed sessions get Date.now() instead of their original timestamp.
+        const dbSession = this.dbManager.getSessionById(session.sessionDbId);
         await processAgentResponse(
           initResponse.content,
           session,
@@ -129,7 +131,7 @@ export class OpenRouterAgent {
           this.sessionManager,
           worker,
           tokensUsed,
-          null,
+          dbSession.started_at_epoch,
           'OpenRouter',
           undefined  // No lastCwd yet - before message processing
         );
